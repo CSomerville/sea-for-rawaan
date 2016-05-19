@@ -1,5 +1,6 @@
 var container, camera, scene, renderer, raycaster, cards = [], isRotating = [];
 var mouse = new THREE.Vector2();
+var target = new THREE.Vector3(-100, 0, 0);
 var intersection = null;
 
 window.onload = function() {
@@ -13,7 +14,9 @@ function init() {
   document.body.appendChild( container );
 
   camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 );
-  camera.position.y = 400;
+  camera.position.y = 700;
+  camera.position.x = -600;
+
 
   scene = new THREE.Scene();
 
@@ -29,28 +32,32 @@ function init() {
   map1.wrapS = map1.wrapT = THREE.reapeatWrapping;
   map1.anisotropy = 16;
 
-  var map2 = new THREE.TextureLoader().load( '/static/images/businesscard_birdie.jpg' );
-  map2.wrapS = map2.wrapT = THREE.reapeatWrapping;
-  map2.anisotropy = 16;
+  var map2;
+  var urls = shuffleImages();
 
   for ( var i = 0; i < 20; i++) {
+
+    map2 = new THREE.TextureLoader().load( '/static/images/' + urls[ i ] );
+    map2.wrapS = map2.wrapT = THREE.reapeatWrapping;
+    map2.anisotropy = 16;
+
     card = new THREE.Object3D();
     scene.add( card );
     cards.push( card );
 
     var material1 = new THREE.MeshLambertMaterial( { map: map1, side: THREE.DoubleSide } );
     var material2 = new THREE.MeshLambertMaterial( { map: map2, side: THREE.DoubleSide } );
-    var x = ((i%4) * 200) - 400;
-    var z = ((Math.floor(i/4)) * 200) - 500;
+    var x = ((i%4) * 200) - 300;
+    var z = ((Math.floor(i/4)) * 160) - 340;
 
 
-    object1 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100, 4, 4 ), material1 );
+    object1 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 160, 4, 4 ), material1 );
 
-    object2 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100, 4, 4 ), material2 );
-    object2.position.set( 0, 0, -1 );
+    object2 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 160, 4, 4 ), material2 );
+    object2.position.set( 0, 0, 1 );
 
     card.position.set( x, 0, z );
-    card.rotation.set( toRadians(90), 0, 0 );
+    card.rotation.set( toRadians(90), 0, toRadians(270) );
     card.add( object1 );
     card.add( object2 );
   }
@@ -74,6 +81,32 @@ function onWindowResize() {
   camera.updateProjectionMatrix();
 
   renderer.setSize( window.innerWidth, window.innerHeight );
+}
+
+function shuffleImages() {
+  var urls = [
+    "businesscard_back_babasouk.jpg",
+    "businesscard_birdie.jpg",
+    "businesscard_blue_dino_luxe.jpg",
+    "businesscard_camel.jpg",
+    "businesscard_cheetah.jpg",
+    "businesscard_deep_tiger.jpg",
+    "businesscard_fox.jpg",
+    "businesscard_pale_marmoset.jpg",
+    "businesscard_peach_kangaroo.jpg",
+    "businesscard_pink_giraffe.jpg"
+  ];
+
+  urls = urls.concat(urls);
+
+  for ( var i = urls.length-1; i >= 0; i--) {
+    var rand = Math.floor(Math.random() * (i));
+    var swap = urls[rand];
+    urls[rand] = urls[i];
+    urls[i] = swap;
+  }
+
+  return urls;
 }
 
 function onMouseMove( event ) {
@@ -112,11 +145,8 @@ function toRadians(degrees) {
 }
 
 function render() {
-  var timer = Date.now() * 0.0001;
 
-  camera.position.x = Math.cos( timer ) * 800;
-  camera.position.z = Math.sin( timer ) * 800;
-  camera.lookAt( scene.position );
+  camera.lookAt( target );
   camera.updateMatrixWorld();
 
   for ( var i = isRotating.length - 1; i >= 0; i-- ) {
