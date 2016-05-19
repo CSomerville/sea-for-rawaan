@@ -17,7 +17,7 @@ function init() {
 
   scene = new THREE.Scene();
 
-  var light, object;
+  var light, object1, object2, card;
 
   scene.add( new THREE.AmbientLight( 0x404040 ) );
 
@@ -25,22 +25,34 @@ function init() {
   light.position.set( 0, 1, 0 );
   scene.add( light );
 
-  var map = new THREE.TextureLoader().load( '/static/images/businesscard_back_babasouk.jpg' );
-  map.wrapS = map.wrapT = THREE.reapeatWrapping;
-  map.anisotropy = 16;
+  var map1 = new THREE.TextureLoader().load( '/static/images/businesscard_back_babasouk.jpg' );
+  map1.wrapS = map1.wrapT = THREE.reapeatWrapping;
+  map1.anisotropy = 16;
 
+  var map2 = new THREE.TextureLoader().load( '/static/images/businesscard_birdie.jpg' );
+  map2.wrapS = map2.wrapT = THREE.reapeatWrapping;
+  map2.anisotropy = 16;
 
   for ( var i = 0; i < 20; i++) {
-    var material = new THREE.MeshLambertMaterial( { map: map, side: THREE.DoubleSide } );
+    card = new THREE.Object3D();
+    scene.add( card );
+    cards.push( card );
+
+    var material1 = new THREE.MeshLambertMaterial( { map: map1, side: THREE.DoubleSide } );
+    var material2 = new THREE.MeshLambertMaterial( { map: map2, side: THREE.DoubleSide } );
     var x = ((i%4) * 200) - 400;
     var z = ((Math.floor(i/4)) * 200) - 500;
 
 
-    object = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100, 4, 4 ), material );
-    object.position.set( x, 0, z );
-    object.rotation.set( toRadians(90), 0, 0 );
-    cards.push( object );
-    scene.add( object );
+    object1 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100, 4, 4 ), material1 );
+
+    object2 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100, 4, 4 ), material2 );
+    object2.position.set( 0, 0, -1 );
+
+    card.position.set( x, 0, z );
+    card.rotation.set( toRadians(90), 0, 0 );
+    card.add( object1 );
+    card.add( object2 );
   }
 
 
@@ -74,14 +86,16 @@ function onMouseMove( event ) {
 function onMouseDown( event ) {
   event.preventDefault();
 
+  console.log( cards );
+
   raycaster.setFromCamera( mouse, camera );
-  var intersects = raycaster.intersectObjects( cards );
+  var intersects = raycaster.intersectObjects( cards, true );
 
 
   if (intersects.length) {
     isRotating.push( {
-      object: intersects[ 0 ].object,
-      target: intersects[ 0 ].object.rotation.clone().x += toRadians(180)
+      object: intersects[ 0 ].object.parent,
+      target: intersects[ 0 ].object.parent.rotation.clone().x += toRadians(180)
     } );
     console.log(isRotating[0])
   }
