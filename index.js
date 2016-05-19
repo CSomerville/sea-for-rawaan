@@ -1,4 +1,6 @@
-var container, camera, scene, renderer;
+var container, camera, scene, renderer, raycaster, cards = [], isRotating = [];
+var mouse = new THREE.Vector2();
+var intersection = null;
 
 window.onload = function() {
   init();
@@ -27,9 +29,9 @@ function init() {
   map.wrapS = map.wrapT = THREE.reapeatWrapping;
   map.anisotropy = 16;
 
-  var material = new THREE.MeshLambertMaterial( { map: map, side: THREE.DoubleSide } );
 
   for ( var i = 0; i < 20; i++) {
+    var material = new THREE.MeshLambertMaterial( { map: map, side: THREE.DoubleSide } );
     var x = ((i%4) * 200) - 400;
     var z = ((Math.floor(i/4)) * 200) - 500;
 
@@ -37,6 +39,7 @@ function init() {
     object = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100, 4, 4 ), material );
     object.position.set( x, 0, z );
     object.rotation.set( toRadians(90), 0, 0 );
+    cards.push( object );
     scene.add( object );
   }
 
@@ -45,9 +48,13 @@ function init() {
   renderer.setPixelRatio( window.devicePixelRatio );
   renderer.setSize( window.innerWidth, window.innerHeight );
 
+  raycaster = new THREE.Raycaster();
+
   container.appendChild( renderer.domElement );
 
   window.addEventListener( 'resize', onWindowResize, false );
+  document.addEventListener( 'mousemove', onMouseMove, false );
+  document.addEventListener( 'mousedown', onMouseDown, false );
 }
 
 function onWindowResize() {
@@ -55,6 +62,29 @@ function onWindowResize() {
   camera.updateProjectionMatrix();
 
   renderer.setSize( window.innerWidth, window.innerHeight );
+}
+
+function onMouseMove( event ) {
+  event.preventDefault();
+
+  mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+  mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+}
+
+function onMouseDown( event ) {
+  event.preventDefault();
+
+  raycaster.setFromCamera( mouse, camera );
+  var intersects = raycaster.intersectObjects( cards );
+
+
+  if (intersects.length) {
+    isRotating.push( {
+      object: intersects[ 0 ].object,
+      target: intersects[ 0 ].object.rotation.clone().x += toRadians(180)
+    } );
+    console.log(isRotating[0])
+  }
 }
 
 
@@ -73,6 +103,17 @@ function render() {
   camera.position.x = Math.cos( timer ) * 800;
   camera.position.z = Math.sin( timer ) * 800;
   camera.lookAt( scene.position );
+  camera.updateMatrixWorld();
+
+  for ( var i = isRotating.length - 1; i >= 0; i-- ) {
+    if ( isRotating[ i ].object.rotation.x < isRotating[ i ].target ) {
+      isRotating[ i ].object.rotation.x += toRadians(5);
+    } else {
+      isRotating[ i ].object.rotation.x = isRotating[ i ].target;
+      isRotating.splice(i, 1);
+    }
+  }
+
 
   renderer.render( scene, camera );
 }
