@@ -1,4 +1,4 @@
-var container, camera, scene, renderer, raycaster, cards = [], isRotating = [];
+var container, camera, scene, renderer, raycaster, game, cards = [], isRotating = [];
 var mouse = new THREE.Vector2();
 var target = new THREE.Vector3(-100, 0, 0);
 var intersection = null;
@@ -6,6 +6,54 @@ var intersection = null;
 window.onload = function() {
   init();
   animate();
+}
+
+var Game = function() {
+  this.cards = {};
+  this.correctStack = [];
+}
+
+Game.prototype.setCard = function(uuid, description) {
+  this.cards[ uuid ] = {
+    uuid: uuid,
+    description: description,
+    canRotate: false
+  }
+}
+
+Game.prototype.getCard = function(uuid) {
+  return this.cards[ uuid ];
+}
+
+Game.prototype.canRotateAll = function() {
+  Object.keys( this.cards ).forEach( function(key) {
+
+    var inCorrectStack = this.correctStack.filter( function( el ) {
+      return key === el.uuid
+    });
+
+    if (!inCorrectStack.length) {
+      this.cards[ key ].canRotate = true;
+    }
+  }.bind(this));
+}
+
+Game.prototype.cannotRotateAny = function() {
+  Object.keys( this.cards ).forEach( function( key ) {
+    this.cards[ key ].canRotate = false;
+  }.bind(this));
+}
+
+Game.prototype.setRotate = function( uuid, value ) {
+  this.cards[ uuid ].canRotate = value;
+}
+
+Game.prototype.getThreeCard = function( sceneChildren, uuid ) {
+  for ( var i = 0; i < sceneChildren.length; i++ ) {
+    if ( sceneChildren[ i ].uuid === uuid ) {
+      return sceneChildren[ i ];
+    }
+  }
 }
 
 function init() {
@@ -17,6 +65,7 @@ function init() {
   camera.position.y = 700;
   camera.position.x = -600;
 
+  game = new Game();
 
   scene = new THREE.Scene();
 
@@ -44,6 +93,8 @@ function init() {
     card = new THREE.Object3D();
     scene.add( card );
     cards.push( card );
+
+    game.setCard( card.uuid, urls[ i ] );
 
     var material1 = new THREE.MeshLambertMaterial( { map: map1, side: THREE.DoubleSide } );
     var material2 = new THREE.MeshLambertMaterial( { map: map2, side: THREE.DoubleSide } );
@@ -74,6 +125,8 @@ function init() {
   window.addEventListener( 'resize', onWindowResize, false );
   document.addEventListener( 'mousemove', onMouseMove, false );
   document.addEventListener( 'mousedown', onMouseDown, false );
+
+  game.canRotateAll();
 }
 
 function onWindowResize() {
@@ -100,10 +153,14 @@ function shuffleImages() {
   urls = urls.concat(urls);
 
   for ( var i = urls.length-1; i >= 0; i--) {
-    var rand = Math.floor(Math.random() * (i));
-    var swap = urls[rand];
-    urls[rand] = urls[i];
-    urls[i] = swap;
+    var rand = Math.floor(Math.random() * i);
+    if (rand === i) {
+      break;
+    } else {
+      var swap = urls[rand];
+      urls[rand] = urls[i];
+      urls[i] = swap;
+    }
   }
 
   return urls;
@@ -119,19 +176,56 @@ function onMouseMove( event ) {
 function onMouseDown( event ) {
   event.preventDefault();
 
-  console.log( cards );
-
   raycaster.setFromCamera( mouse, camera );
   var intersects = raycaster.intersectObjects( cards, true );
 
 
+
   if (intersects.length) {
-    isRotating.push( {
-      object: intersects[ 0 ].object.parent,
-      target: intersects[ 0 ].object.parent.rotation.clone().x += toRadians(180)
-    } );
-    console.log(isRotating[0])
+    var parent = intersects[ 0 ].object.parent;
+
+    if (game.getCard( parent.uuid ).canRotate) {
+
+      isRotating.push( {
+        object: intersects[ 0 ].object.parent,
+        target: intersects[ 0 ].object.parent.rotation.clone().x += toRadians(180)
+      } );
+
+      game.setRotate( parent.uuid, false );
+      game.correctStack.push( game.getCard( parent.uuid ) );
+
+
+      if ( game.correctStack.length && game.correctStack.length % 2 === 0 ) {
+        var lastTwo = game.correctStack.slice(game.correctStack.length -2);
+
+        if ( lastTwo[ 0 ].description !== lastTwo[ 1 ].description ) {
+          game.cannotRotateAny();
+          setTimeout(function() {
+            var uuid1 = game.correctStack.pop().uuid;
+            var uuid2 = game.correctStack.pop().uuid;
+            var card1 = game.getThreeCard( scene.children, uuid1 );
+            var card2 = game.getThreeCard( scene.children, uuid2 );
+            isRotating.push( {
+              object: card1,
+              target: card1.rotation.clone().x += toRadians(180)
+            } );
+            isRotating.push( {
+              object: card2,
+              target: card2.rotation.clone().x += toRadians(180)
+            } );
+
+            setTimeout(function() {
+              game.canRotateAll();
+            }, 1000);
+          }, 2000);
+        }
+      }
+    }
+
   }
+
+
+
 }
 
 
