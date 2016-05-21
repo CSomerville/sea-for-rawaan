@@ -77,14 +77,18 @@ Game.prototype.getRotation = function( uuid ) {
 Game.prototype.firstLook = function() {
   var target;
   Object.keys( this.cards ).forEach( function( key ) {
-    target = getCardById( key ).rotation.clone().x + toRadians(180);
 
+    setVisible( key, 'front', true );
+
+    target = getCardById( key ).rotation.clone().x + toRadians(180);
     this.setRotation( key, true, 'counter', target, function() {
+      setVisible( key, 'back', false );
 
       target = getCardById( key ).rotation.clone().x - toRadians(180);
       setTimeout( function() {
-        var date = new Date();
+        setVisible( key, 'back', true );
         this.setRotation( key, true, 'clockwise', target, function() {
+          setVisible( key, 'front', false );
           this.setCanRotate( key, true );
         }.bind(this));
       }.bind(this), 5000);
@@ -98,7 +102,7 @@ Game.prototype.runRotation = function( cards ) {
     var rotation = this.getRotation( card.uuid );
     if ( rotation.rotating ) {
       if ( rotation.direction === 'counter' ) {
-        if ( card.rotation.x < rotation.target ) {
+        if ( card.rotation.x <= rotation.target ) {
           card.rotation.x += toRadians( 5 );
         } else {
           card.rotation.x = rotation.target;
@@ -106,7 +110,7 @@ Game.prototype.runRotation = function( cards ) {
           if ( rotation.cb ) rotation.cb();
         }
       } else {
-        if ( card.rotation.x > rotation.target ) {
+        if ( card.rotation.x >= rotation.target ) {
           card.rotation.x -= toRadians( 5 );
         } else {
           card.rotation.x = rotation.target;
@@ -120,9 +124,11 @@ Game.prototype.runRotation = function( cards ) {
 
 /* GLOBALS */
 
-var container, camera, scene, renderer, raycaster, game, cards = [];
+var container, camera, scene, renderer, raycaster, game, waterGeometry, waterMesh, cards = [];
+var worldWidth = 128, worldDepth = 128;
 var mouse = new THREE.Vector2();
 var target = new THREE.Vector3(-100, 0, 0);
+var clock = new THREE.Clock();
 
 window.onload = function() {
   init();
@@ -140,12 +146,14 @@ function init() {
 
   /*  SCENE */
   scene = new THREE.Scene();
-
+  scene.fog = new THREE.FogExp2( 0xb09780, 0.0007 );
+  // 0xffda93
+  // 0xaaccff
 
   /*  CAMERA */
   camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 );
   camera.position.y = 600;
-  camera.position.x = -500;
+  camera.position.x = -600;
 
 
   /*  LIGHT */
@@ -156,9 +164,31 @@ function init() {
   scene.add( light );
 
 
+  /*  WATER GEOMETRY */
+
+  waterGeometry = new THREE.PlaneGeometry( 2000, 2000, worldWidth - 1, worldDepth - 1 );
+  waterGeometry.rotateX( toRadians(90) );
+
+  for ( var i = 0, l = waterGeometry.vertices.length; i < l; i++ ) {
+    waterGeometry.vertices[ i ].y = 35 * Math.sin( i / 2 );
+  }
+
+  var texture = new THREE.TextureLoader().load( '/static/images/water.jpg' );
+  texture.wrapS = texture.wrapT = THREE.repeatWrapping;
+  texture.repeat.set( 5, 5 );
+
+  var material = new THREE.MeshBasicMaterial( { color: 0x2faa7b, map: texture } );
+  // 0x2faa7b
+
+  waterMesh = new THREE.Mesh( waterGeometry, material );
+  waterMesh.rotation.set( toRadians(180), 0, 0 );
+  waterMesh.position.set( 0, -40, 0 );
+	scene.add( waterMesh );
+
+
   /*  BACK OF CARD TEXTURE MAP */
   var map1 = new THREE.TextureLoader().load( '/static/images/MG_back_pearl_net.jpg' );
-  map1.wrapS = map1.wrapT = THREE.reapeatWrapping;
+  map1.wrapS = map1.wrapT = THREE.repeatWrapping;
   map1.anisotropy = 16;
 
   /*  Each card object consists of two children: front and back of the card.
@@ -188,9 +218,11 @@ function init() {
     var material1 = new THREE.MeshLambertMaterial( { map: map1, side: THREE.DoubleSide } );
     var material2 = new THREE.MeshLambertMaterial( { map: map2, side: THREE.DoubleSide } );
 
-    object1 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 160, 4, 4 ), material1 );
+    object1 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 166, 4, 4 ), material1 );
+    object1.name = "back";
 
-    object2 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 160, 4, 4 ), material2 );
+    object2 = new THREE.Mesh( new THREE.PlaneGeometry( 100, 166, 4, 4 ), material2 );
+    object2.name = "front";
     object2.position.set( 0, 0, 1 ); // object2 is below object1
 
     card.add( object1 );
@@ -202,6 +234,9 @@ function init() {
 
     card.position.set( x, 0, z );
     card.rotation.set( toRadians(90), 0, toRadians(270) );
+
+    /*  CARD SIDE VISIBILITY */
+    setVisible( card.uuid, 'front', false );
   }
 
   /*  RENDERER */
@@ -288,11 +323,16 @@ function onMouseDown( event ) {
     parent = intersects[ 0 ].object.parent;
 
     if ( game.getCard( parent.uuid ).canRotate ) {
+      setVisible( parent.uuid, 'front', true );
       target = parent.rotation.clone().x + toRadians(180);
-      game.setRotation( parent.uuid, true, 'counter', target, null );
+      game.setRotation( parent.uuid, true, 'counter', target, function() {
+        setVisible( parent.uuid, 'back', false );
+      } );
       game.setCanRotate( parent.uuid, false );
       game.correctStack.push( game.getCard( parent.uuid ) );
 
+      if ( game.correctStack.length === 20 )
+        win();
       if ( game.correctStack.length % 2 === 0 )
         checkForMatch();
     }
@@ -309,10 +349,18 @@ function checkForMatch() {
       var uuid1 = game.correctStack.pop().uuid;
       var uuid2 = game.correctStack.pop().uuid;
 
+      setVisible( uuid1, 'back', true );
+      setVisible( uuid2, 'back', true );
+
       var target1 = getCardById( uuid1 ).rotation.clone().x -= toRadians(180);
       var target2 = getCardById( uuid2 ).rotation.clone().x -= toRadians(180);
-      game.setRotation( uuid1, true, 'clockwise', target1, null );
-      game.setRotation( uuid2, true, 'clockwise', target2, game.canRotateAll.bind(game) );
+      game.setRotation( uuid1, true, 'clockwise', target1, function() {
+        setVisible( uuid1, 'front', false );
+      } );
+      game.setRotation( uuid2, true, 'clockwise', target2, function() {
+        setVisible( uuid2, 'front', false );
+        game.canRotateAll();
+      } );
     }, 2000 );
 
   } else {
@@ -321,56 +369,9 @@ function checkForMatch() {
   }
 }
 
-// function onMouseDown( event ) {
-//   event.preventDefault();
-//
-//   raycaster.setFromCamera( mouse, camera );
-//   var intersects = raycaster.intersectObjects( cards, true );
-//
-//
-//
-//   if (intersects.length) {
-//     var parent = intersects[ 0 ].object.parent;
-//
-//     if (game.getCard( parent.uuid ).canRotate) {
-//
-//       isRotating.push( {
-//         object: intersects[ 0 ].object.parent,
-//         target: intersects[ 0 ].object.parent.rotation.clone().x += toRadians(180)
-//       } );
-//
-//       game.setRotate( parent.uuid, false );
-//       game.correctStack.push( game.getCard( parent.uuid ) );
-//
-//
-//       if ( game.correctStack.length && game.correctStack.length % 2 === 0 ) {
-//         var lastTwo = game.correctStack.slice(game.correctStack.length -2);
-//
-//         if ( lastTwo[ 0 ].description !== lastTwo[ 1 ].description ) {
-//           game.cannotRotateAny();
-//           setTimeout(function() {
-//             var uuid1 = game.correctStack.pop().uuid;
-//             var uuid2 = game.correctStack.pop().uuid;
-//             var card1 = game.getThreeCard( scene.children, uuid1 );
-//             var card2 = game.getThreeCard( scene.children, uuid2 );
-//             isRotating.push( {
-//               object: card1,
-//               target: card1.rotation.clone().x += toRadians(180)
-//             } );
-//             isRotating.push( {
-//               object: card2,
-//               target: card2.rotation.clone().x += toRadians(180)
-//             } );
-//
-//             setTimeout(function() {
-//               game.canRotateAll();
-//             }, 1000);
-//           }, 2000);
-//         }
-//       }
-//     }
-//   }
-// }
+function win() {
+  console.log('successsssss')
+}
 
 function getCardById( uuid ) {
   for ( var i = 0; i < cards.length; i++ ) {
@@ -378,6 +379,12 @@ function getCardById( uuid ) {
       return cards[ i ];
     }
   }
+}
+
+function setVisible( uuid, name, value ) {
+  var card = getCardById( uuid );
+  var side = card.getObjectByName( name );
+  side.visible = value;
 }
 
 
@@ -396,6 +403,14 @@ function render() {
   camera.updateMatrixWorld();
 
   game.runRotation( cards );
+
+  var time = clock.getElapsedTime() * 10;
+
+  for ( var i = 0, l = waterGeometry.vertices.length; i < l; i++ ) {
+    waterGeometry.vertices[ i ].y = 35 * Math.sin( i / 5 + ( time + i ) / 7 );
+  }
+
+  waterMesh.geometry.verticesNeedUpdate = true;
 
   renderer.render( scene, camera );
 }
