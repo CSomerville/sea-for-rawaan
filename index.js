@@ -152,7 +152,7 @@ function init() {
 
   /*  CAMERA */
   camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 );
-  camera.position.y = 600;
+  camera.position.y = 650;
   camera.position.x = -600;
 
 
@@ -166,7 +166,7 @@ function init() {
 
   /*  WATER GEOMETRY */
 
-  waterGeometry = new THREE.PlaneGeometry( 2000, 2000, worldWidth - 1, worldDepth - 1 );
+  waterGeometry = new THREE.PlaneGeometry( 4000, 4000, worldWidth - 1, worldDepth - 1 );
   waterGeometry.rotateX( toRadians(90) );
 
   for ( var i = 0, l = waterGeometry.vertices.length; i < l; i++ ) {
