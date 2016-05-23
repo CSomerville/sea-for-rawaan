@@ -1,21 +1,3 @@
-/*
-
-What are the states of the cards?
-* back up clickable
-* back up not-clickable
-* face up matched
-* face up not-matched
-* rotating clockwise
-* rotating counter-clockwise
-
--- static --
-uuid
-url
-description
-*/
-
-var timer = 0;
-
 var Game = function() {
   this.cards = {};
   this.correctStack = [];
@@ -129,6 +111,7 @@ var worldWidth = 128, worldDepth = 128;
 var mouse = new THREE.Vector2();
 var target = new THREE.Vector3(-100, 0, 0);
 var clock = new THREE.Clock();
+var victory = false, ctr = 0;
 
 window.onload = function() {
   init();
@@ -256,7 +239,7 @@ function init() {
   document.addEventListener( 'mousemove', onMouseMove, false );
   document.addEventListener( 'mousedown', onMouseDown, false );
 
-  setTimeout(function() { game.firstLook() }, 1000)
+  setTimeout(function() { game.firstLook() }, 1000);
 }
 
 function onWindowResize() {
@@ -314,6 +297,9 @@ function onMouseMove( event ) {
 function onMouseDown( event ) {
   event.preventDefault();
 
+  if (victory && ctr === 260) {
+    readNextCard();
+  }
   var parent, intersects, target;
 
   raycaster.setFromCamera( mouse, camera );
@@ -332,7 +318,7 @@ function onMouseDown( event ) {
       game.correctStack.push( game.getCard( parent.uuid ) );
 
       if ( game.correctStack.length === 20 )
-        win();
+        setTimeout( function() { win() }, 1000);
       if ( game.correctStack.length % 2 === 0 )
         checkForMatch();
     }
@@ -370,7 +356,54 @@ function checkForMatch() {
 }
 
 function win() {
-  console.log('successsssss')
+  victory = true;
+  var uuid, card;
+  for ( var i = 0, l = game.correctStack.length; i < l; i++ ) {
+    uuid = game.correctStack[ i ].uuid;
+    card = getCardById( uuid );
+    game.correctStack[ i ].deltas = {
+      positionX: -460 - card.position.x + i,
+      positionY: 470 - card.position.y,
+      positionZ: 0 - card.position.z,
+      offset: i * 10
+    }
+  }
+}
+
+function readNextCard() {
+  if (!game.correctStack.length) return;
+  var cardMeta = game.correctStack.shift();
+  game.cards[ cardMeta.uuid ].fallingCtr = 0;
+}
+
+function dropCards() {
+  for ( var key in game.cards ) {
+    if (game.cards[ key ].fallingCtr >= 0) {
+      var card = getCardById( key );
+      card.rotation.z -= toRadians(2);
+      card.position.y -= 3;
+      card.position.x -= 7;
+      game.cards[ key ].fallingCtr++;
+      if ( game.cards[ key ].fallingCtr > 60 ) game.cards[ key ].fallingCtr = null;
+    }
+  }
+}
+
+function stackCards() {
+  var uuid, card, deltas;
+  for (var i = 0, l = game.correctStack.length; i < l; i++) {
+    uuid = game.correctStack[ i ].uuid;
+    card = getCardById( uuid );
+    deltas = game.correctStack[ i ].deltas;
+    if (deltas.offset < ctr && (ctr - deltas.offset) <= 60) {
+
+      card.position.x += ( deltas.positionX / 60 );
+      card.position.y += ( deltas.positionY / 60 );
+      card.position.z += ( deltas.positionZ / 60 );
+      card.rotation.y -= ( toRadians(33) / 60 );
+    }
+  }
+  ctr++;
 }
 
 function getCardById( uuid ) {
@@ -397,12 +430,30 @@ function toRadians(degrees) {
   return degrees * (Math.PI / 180)
 }
 
+// function testEnding() {
+//   /*  REMOVE FOR PRODUCTION */
+//   var keys = Object.keys( game.cards );
+//
+//   for ( var i = 0, l = keys.length; i < l; i++) {
+//     setVisible( keys[ i ], 'front', true );
+//
+//     var target = getCardById( keys[ i ] ).rotation.clone().x + toRadians(180);
+//     game.setRotation( keys[ i ], true, 'counter', target, (i === l-1) ? win : null );
+//   }
+// }
+
 function render() {
 
   camera.lookAt( target );
   camera.updateMatrixWorld();
 
-  game.runRotation( cards );
+  if (victory && ctr < 260) {
+    stackCards();
+  } else if (victory && ctr === 260) {
+    dropCards();
+  } else {
+    game.runRotation( cards );
+  }
 
   var time = clock.getElapsedTime() * 10;
 
