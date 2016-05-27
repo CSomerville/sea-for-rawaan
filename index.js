@@ -430,18 +430,6 @@ function toRadians(degrees) {
   return degrees * (Math.PI / 180)
 }
 
-// function testEnding() {
-//   /*  REMOVE FOR PRODUCTION */
-//   var keys = Object.keys( game.cards );
-//
-//   for ( var i = 0, l = keys.length; i < l; i++) {
-//     setVisible( keys[ i ], 'front', true );
-//
-//     var target = getCardById( keys[ i ] ).rotation.clone().x + toRadians(180);
-//     game.setRotation( keys[ i ], true, 'counter', target, (i === l-1) ? win : null );
-//   }
-// }
-
 function render() {
 
   camera.lookAt( target );
